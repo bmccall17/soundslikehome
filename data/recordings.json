@@ -1,0 +1,46 @@
+[
+  {
+    "id": "f3406ba9-a67c-4607-a6d6-0e13b098c638",
+    "filename": "recording-f3406ba9-a67c-4607-a6d6-0e13b098c638.webm",
+    "prompt": "Test recording",
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "tags": [],
+    "approved": false,
+    "duration": 52
+  },
+  {
+    "id": "ae2a541a-994c-4b55-8c6f-69ae33527601",
+    "filename": "recording-ae2a541a-994c-4b55-8c6f-69ae33527601.webm",
+    "prompt": "Describe the sound of welcome in your home.",
+    "timestamp": "2025-07-20T18:58:33.754Z",
+    "tags": [
+      "home",
+      "sensory",
+      "welcome",
+      "descriptive"
+    ],
+    "approved": true,
+    "duration": 42
+  },
+  {
+    "id": "ee77573a-e025-4ffb-99d6-d9c764c760a7",
+    "filename": "recording-ee77573a-e025-4ffb-99d6-d9c764c760a7.webm",
+    "prompt": "What does comfort sound like to you?",
+    "timestamp": "2025-07-20T19:29:23.121Z",
+    "tags": [
+      "comfort",
+      "sensory"
+    ],
+    "approved": true,
+    "duration": 50
+  },
+  {
+    "id": "7a55689a-6d01-49d3-8038-ee62137732cc",
+    "filename": "recording-7a55689a-6d01-49d3-8038-ee62137732cc.webm",
+    "prompt": "Share a sound that instantly transports you somewhere special.",
+    "timestamp": "2025-07-20T22:09:30.824Z",
+    "tags": [],
+    "approved": true,
+    "duration": 53
+  }
+]

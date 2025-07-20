@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sounds Like Home</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="title">Sounds Like Home</h1>
+        </header>
+        
+        <main class="content">
+            <div class="prompt-section">
+                <p class="prompt-text" id="current-prompt">Loading your moment...</p>
+            </div>
+            
+            <div class="recording-section">
+                <button class="record-btn" id="record-btn">
+                    <span class="record-icon"></span>
+                    <span class="record-text">Record</span>
+                </button>
+                
+                <div class="action-buttons hidden" id="action-buttons">
+                    <button class="action-btn submit-btn" id="submit-btn">Submit to Home</button>
+                    <button class="action-btn restart-btn" id="restart-btn">Restart Recording</button>
+                </div>
+                
+                <div class="recording-indicator hidden" id="recording-indicator">
+                    <div class="pulse-circle"></div>
+                    <span class="recording-text">Recording...</span>
+                </div>
+            </div>
+            
+            <div class="listen-section">
+                <button class="listen-btn" id="listen-btn">Listen</button>
+                <div class="listening-prompt hidden" id="listening-prompt">
+                    <p class="listening-prompt-text" id="listening-prompt-text"></p>
+                </div>
+            </div>
+        </main>
+        
+        <div class="audio-player hidden" id="audio-player">
+            <audio controls id="playback-audio"></audio>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
