@@ -1,7 +1,7 @@
 <img width="34%" height="658" alt="Screenshot 2025-07-21 100446" src="https://github.com/user-attachments/assets/345a5d2e-b810-41bb-b724-c61a44ab679f" />
 <img width="60%" height="913" alt="Screenshot 2025-07-21 100531" src="https://github.com/user-attachments/assets/ffa6283b-9d57-4d8c-9bb9-55d09e69d6b6" />
 <br>
-## 🌀 Product Concept: **Sounds Like Home**
+🌀 Product Concept: **Sounds Like Home**
 
 ### 🎯 **Problem**
 In a world that is increasingly noisy and disconnected, many people feel untethered—from family, from self, from source. They crave a sense of *home*, whether that's a person, place, memory, or feeling. But they often don’t know how to reconnect.
