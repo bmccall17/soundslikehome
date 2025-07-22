@@ -31,3 +31,5 @@ This creates a tender, global whisper network—a spiritual jukebox of humanity,
 - 📡 AI-powered tone match: hear responses from people in similar emotional resonance.
 - 🧭 “Guided Tones” feature with music or vocal toning as a warm-up ritual (playing on *Om*).
 - 🔒 Optional privacy toggle (public vs. private cloud pools)
+<img width="483" height="658" alt="Screenshot 2025-07-21 100446" src="https://github.com/user-attachments/assets/345a5d2e-b810-41bb-b724-c61a44ab679f" />
+<img width="1256" height="913" alt="Screenshot 2025-07-21 100531" src="https://github.com/user-attachments/assets/ffa6283b-9d57-4d8c-9bb9-55d09e69d6b6" />
