@@ -6,40 +6,32 @@ const url = require('url');
 const querystring = require('querystring');
 
 const PORT = 3000;
-const RECORDINGS_DIR = path.join(__dirname, 'recordings');
-const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
+// DISABLED FOR VERCEL TESTING
+// const RECORDINGS_DIR = path.join(__dirname, 'recordings');
+// const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
+
+// Mock data for Vercel testing
+let mockRecordings = [];
 
 // Simple session storage (in memory)
 const sessions = new Map();
 
-// Initialize data file if it doesn't exist
+// Initialize data file if it doesn't exist - DISABLED FOR VERCEL
 async function initializeDataFile() {
-    try {
-        await fs.access(DATA_FILE);
-    } catch {
-        await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
-        await fs.writeFile(DATA_FILE, JSON.stringify([], null, 2));
-    }
+    console.log('🚫 File operations disabled for Vercel testing - using mock data');
+    return Promise.resolve();
 }
 
-// Data management functions
+// Data management functions - MOCK FOR VERCEL
 async function loadRecordings() {
-    try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error loading recordings:', error);
-        return [];
-    }
+    console.log('📝 Using mock recordings for Vercel testing');
+    return Promise.resolve(mockRecordings);
 }
 
 async function saveRecordings(recordings) {
-    try {
-        await fs.writeFile(DATA_FILE, JSON.stringify(recordings, null, 2));
-    } catch (error) {
-        console.error('Error saving recordings:', error);
-        throw error;
-    }
+    console.log('📝 Mock saving recordings for Vercel testing');
+    mockRecordings = recordings;
+    return Promise.resolve();
 }
 
 // Generate simple UUID
@@ -188,72 +180,13 @@ async function requestHandler(req, res) {
                         return;
                     }
 
-                    // Generate unique ID and filename
+                    // Generate unique ID and filename - MOCK FOR VERCEL
                     const id = generateUUID();
                     const filename = `recording-${id}.webm`;
-                    const filepath = path.join(RECORDINGS_DIR, filename);
                     
-                    console.log('📁 Saving to filepath:', filepath);
-                    console.log('📂 RECORDINGS_DIR:', RECORDINGS_DIR);
-
-                    // Ensure recordings directory exists
-                    await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-                    console.log('✅ Recordings directory confirmed/created');
-
-                    // Convert base64 to buffer and save file
-                    console.log('🔍 Original audioData starts with:', audioData.substring(0, 50));
-                    
-                    // Better base64 extraction - handle different data URI formats
-                    let base64Data;
-                    if (audioData.startsWith('data:')) {
-                        const base64Index = audioData.indexOf('base64,');
-                        if (base64Index !== -1) {
-                            base64Data = audioData.substring(base64Index + 7); // Skip 'base64,'
-                        } else {
-                            throw new Error('Not a base64 data URI');
-                        }
-                    } else {
-                        base64Data = audioData;
-                    }
-                    
-                    console.log('🔄 Base64 data length after processing:', base64Data.length);
-                    console.log('🔍 First 50 chars of base64:', base64Data.substring(0, 50));
-                    
-                    // Validate base64 before conversion
-                    if (!base64Data.match(/^[A-Za-z0-9+/]*={0,2}$/)) {
-                        throw new Error('Invalid base64 format');
-                    }
-                    
-                    let audioBuffer;
-                    try {
-                        audioBuffer = Buffer.from(base64Data, 'base64');
-                        console.log('💾 Audio buffer size:', audioBuffer.length, 'bytes');
-                    } catch (error) {
-                        console.error('❌ Base64 decoding failed:', error);
-                        throw new Error('Failed to decode base64 audio data');
-                    }
-                    
-                    // Check if buffer looks like valid WebM data
-                    if (audioBuffer.length > 4) {
-                        const header = audioBuffer.toString('hex', 0, Math.min(16, audioBuffer.length));
-                        console.log('🔍 Audio buffer hex header:', header);
-                        
-                        // WebM files should start with specific headers
-                        if (audioBuffer[0] === 0x1A && audioBuffer[1] === 0x45 && audioBuffer[2] === 0xDF && audioBuffer[3] === 0xA3) {
-                            console.log('✅ Valid WebM header detected');
-                        } else {
-                            console.log('⚠️ Warning: Does not look like WebM format');
-                        }
-                    } else {
-                        console.log('⚠️ Warning: Audio buffer is very small:', audioBuffer.length, 'bytes');
-                    }
-                    
-                    await fs.writeFile(filepath, audioBuffer);
-                    console.log('✅ Audio file saved successfully');
-                    
-                    // Verify file was written
-                    const stats = await fs.stat(filepath);
-                    console.log('📊 File stats - Size:', stats.size, 'bytes');
+                    console.log('🚫 File writing disabled for Vercel testing');
+                    console.log('🎧 Mock: Would save audio file:', filename);
+                    console.log('📊 Mock audio data received:', audioData ? audioData.length : 0, 'characters');
 
                     // Create recording metadata
                     const recording = {
@@ -322,7 +255,7 @@ async function requestHandler(req, res) {
                 return;
             }
 
-            // Stream audio file
+            // Stream audio file - MOCK FOR VERCEL
             const audioMatch = pathname.match(/^\/api\/recordings\/([^\/]+)\/audio$/);
             if (audioMatch && method === 'GET') {
                 try {
@@ -336,43 +269,17 @@ async function requestHandler(req, res) {
                         return;
                     }
 
-                    const filepath = path.join(RECORDINGS_DIR, recording.filename);
-                    
-                    try {
-                        await fs.access(filepath);
-                    } catch {
-                        res.writeHead(404, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Audio file not found' }));
-                        return;
-                    }
-
-                    // Get file stats for proper headers
-                    const stats = await fs.stat(filepath);
-                    
-                    // Set proper headers for audio streaming
-                    res.writeHead(200, { 
-                        'Content-Type': 'audio/webm',
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': stats.size,
-                        'Cache-Control': 'public, max-age=0'
-                    });
-                    
-                    // Stream the file using createReadStream for better performance
-                    const readStream = require('fs').createReadStream(filepath);
-                    readStream.pipe(res);
-                    
-                    readStream.on('error', (streamError) => {
-                        console.error('Stream error:', streamError);
-                        if (!res.headersSent) {
-                            res.writeHead(500, { 'Content-Type': 'application/json' });
-                            res.end(JSON.stringify({ error: 'Stream error' }));
-                        }
-                    });
+                    console.log('🚫 Audio streaming disabled for Vercel testing');
+                    res.writeHead(503, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ 
+                        error: 'Audio streaming disabled for Vercel testing',
+                        message: 'File operations are not available in this environment'
+                    }));
                     
                 } catch (error) {
-                    console.error('Error streaming audio:', error);
+                    console.error('Error in mock audio endpoint:', error);
                     res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Failed to stream audio' }));
+                    res.end(JSON.stringify({ error: 'Failed to process audio request' }));
                 }
                 return;
             }
@@ -577,14 +484,9 @@ async function requestHandler(req, res) {
                     }
 
                     const recording = recordings[recordingIndex];
-                    const filepath = path.join(RECORDINGS_DIR, recording.filename);
-
-                    // Delete audio file
-                    try {
-                        await fs.unlink(filepath);
-                    } catch (error) {
-                        console.warn('Audio file not found for deletion:', error.message);
-                    }
+                    
+                    // Mock delete audio file for Vercel
+                    console.log('🚫 Mock: Would delete audio file:', recording.filename);
 
                     // Remove from recordings array
                     recordings.splice(recordingIndex, 1);
@@ -628,9 +530,8 @@ async function requestHandler(req, res) {
 // Start server
 async function startServer() {
     try {
-        // Create directories if they don't exist
-        await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-        await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+        // Mock directory creation for Vercel
+        console.log('🚫 Directory creation disabled for Vercel testing');
         
         // Initialize data file
         await initializeDataFile();

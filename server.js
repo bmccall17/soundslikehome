@@ -28,80 +28,61 @@ app.use(session({
     }
 }));
 
-// File storage paths
-const RECORDINGS_DIR = path.join(__dirname, 'recordings');
-const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
-const PROMPTS_FILE = path.join(__dirname, 'data', 'prompts.json');
-const PROMPT_STATE_FILE = path.join(__dirname, 'data', 'prompt-state.json');
+// File storage paths - DISABLED FOR VERCEL TESTING
+// const RECORDINGS_DIR = path.join(__dirname, 'recordings');
+// const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
+// const PROMPTS_FILE = path.join(__dirname, 'data', 'prompts.json');
+// const PROMPT_STATE_FILE = path.join(__dirname, 'data', 'prompt-state.json');
 
-// Initialize data file if it doesn't exist
+// Mock data for Vercel testing
+let mockRecordings = [];
+let mockPrompts = [
+    { id: '1', text: 'Tell me about your favorite childhood memory', active: true, order: 1, createdAt: new Date().toISOString() },
+    { id: '2', text: 'What sound makes you feel most at home?', active: true, order: 2, createdAt: new Date().toISOString() },
+    { id: '3', text: 'Describe a place that brings you peace', active: true, order: 3, createdAt: new Date().toISOString() }
+];
+let mockPromptState = { currentPromptIndex: 0, lastUpdated: new Date().toISOString() };
+
+// Initialize data file if it doesn't exist - DISABLED FOR VERCEL
 async function initializeDataFile() {
-    try {
-        await fs.access(DATA_FILE);
-    } catch {
-        await fs.writeFile(DATA_FILE, JSON.stringify([], null, 2));
-    }
+    console.log('🚫 File operations disabled for Vercel testing - using mock data');
+    return Promise.resolve();
 }
 
-// Data management functions
+// Data management functions - MOCK FOR VERCEL
 async function loadRecordings() {
-    try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error loading recordings:', error);
-        return [];
-    }
+    console.log('📝 Using mock recordings for Vercel testing');
+    return Promise.resolve(mockRecordings);
 }
 
 async function saveRecordings(recordings) {
-    try {
-        await fs.writeFile(DATA_FILE, JSON.stringify(recordings, null, 2));
-    } catch (error) {
-        console.error('Error saving recordings:', error);
-        throw error;
-    }
+    console.log('📝 Mock saving recordings for Vercel testing');
+    mockRecordings = recordings;
+    return Promise.resolve();
 }
 
-// Prompt management functions
+// Prompt management functions - MOCK FOR VERCEL
 async function loadPrompts() {
-    try {
-        const data = await fs.readFile(PROMPTS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error loading prompts:', error);
-        return [];
-    }
+    console.log('📝 Using mock prompts for Vercel testing');
+    return Promise.resolve(mockPrompts);
 }
 
 async function savePrompts(prompts) {
-    try {
-        await fs.writeFile(PROMPTS_FILE, JSON.stringify(prompts, null, 2));
-        console.log('📝 Prompts saved to file');
-    } catch (error) {
-        console.error('Error saving prompts:', error);
-        throw error;
-    }
+    console.log('📝 Mock saving prompts for Vercel testing');
+    mockPrompts = prompts;
+    return Promise.resolve();
 }
 
-// Prompt queue state management functions
+// Prompt queue state management functions - MOCK FOR VERCEL
 async function loadPromptState() {
-    try {
-        const data = await fs.readFile(PROMPT_STATE_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error loading prompt state:', error);
-        return { currentPromptIndex: 0, lastUpdated: new Date().toISOString() };
-    }
+    console.log('📝 Using mock prompt state for Vercel testing');
+    return Promise.resolve(mockPromptState);
 }
 
 async function savePromptState(state) {
-    try {
-        await fs.writeFile(PROMPT_STATE_FILE, JSON.stringify(state, null, 2));
-    } catch (error) {
-        console.error('Error saving prompt state:', error);
-        throw error;
-    }
+    console.log('📝 Mock saving prompt state for Vercel testing');
+    mockPromptState = state;
+    return Promise.resolve();
 }
 
 async function getNextPromptInSequence() {
@@ -201,41 +182,13 @@ app.post('/api/recordings', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Generate unique ID and filename
+        // Generate unique ID and filename - MOCK FOR VERCEL
         const id = uuidv4();
         const filename = `recording-${id}.webm`;
-        const filepath = path.join(RECORDINGS_DIR, filename);
         
-        console.log('📁 Saving to filepath:', filepath);
-        console.log('📂 RECORDINGS_DIR:', RECORDINGS_DIR);
-
-        try {
-            // Check if recordings directory exists and create if needed
-            await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-            console.log('✅ Recordings directory confirmed/created');
-        } catch (dirError) {
-            console.error('❌ Error with recordings directory:', dirError);
-            throw dirError;
-        }
-
-        // Convert base64 to buffer and save file
-        const base64Data = audioData.replace(/^data:audio\/[^;]+;base64,/, '');
-        console.log('🔄 Base64 data length after processing:', base64Data.length);
-        
-        const audioBuffer = Buffer.from(base64Data, 'base64');
-        console.log('💾 Audio buffer size:', audioBuffer.length, 'bytes');
-        
-        try {
-            await fs.writeFile(filepath, audioBuffer);
-            console.log('✅ Audio file saved successfully');
-            
-            // Verify file was written
-            const stats = await fs.stat(filepath);
-            console.log('📊 File stats - Size:', stats.size, 'bytes');
-        } catch (fileError) {
-            console.error('❌ Error writing audio file:', fileError);
-            throw fileError;
-        }
+        console.log('🚫 File writing disabled for Vercel testing');
+        console.log('🎧 Mock: Would save audio file:', filename);
+        console.log('📊 Mock audio data received:', audioData ? audioData.length : 0, 'characters');
 
         // Create recording metadata
         const recording = {
@@ -257,16 +210,9 @@ app.post('/api/recordings', async (req, res) => {
             
             recordings.push(recording);
             await saveRecordings(recordings);
-            console.log('✅ Recording metadata saved to JSON');
+            console.log('✅ Recording metadata saved to mock storage');
         } catch (metadataError) {
             console.error('❌ Error saving metadata:', metadataError);
-            // Try to clean up the audio file if metadata save fails
-            try {
-                await fs.unlink(filepath);
-                console.log('🧹 Cleaned up audio file after metadata error');
-            } catch (cleanupError) {
-                console.error('⚠️ Could not clean up audio file:', cleanupError);
-            }
             throw metadataError;
         }
 
@@ -390,7 +336,7 @@ app.get('/api/recordings/random', async (req, res) => {
     }
 });
 
-// Stream audio file
+// Stream audio file - MOCK FOR VERCEL
 app.get('/api/recordings/:id/audio', async (req, res) => {
     try {
         const recordings = await loadRecordings();
@@ -400,26 +346,15 @@ app.get('/api/recordings/:id/audio', async (req, res) => {
             return res.status(404).json({ error: 'Recording not found' });
         }
 
-        const filepath = path.join(RECORDINGS_DIR, recording.filename);
-        
-        // Check if file exists
-        try {
-            await fs.access(filepath);
-        } catch {
-            return res.status(404).json({ error: 'Audio file not found' });
-        }
-
-        // Set appropriate headers
-        res.setHeader('Content-Type', 'audio/webm');
-        res.setHeader('Accept-Ranges', 'bytes');
-        
-        // Stream the file
-        const readStream = require('fs').createReadStream(filepath);
-        readStream.pipe(res);
+        console.log('🚫 Audio streaming disabled for Vercel testing');
+        res.status(503).json({ 
+            error: 'Audio streaming disabled for Vercel testing',
+            message: 'File operations are not available in this environment'
+        });
         
     } catch (error) {
-        console.error('Error streaming audio:', error);
-        res.status(500).json({ error: 'Failed to stream audio' });
+        console.error('Error in mock audio endpoint:', error);
+        res.status(500).json({ error: 'Failed to process audio request' });
     }
 });
 
@@ -583,14 +518,9 @@ app.delete('/api/admin/recordings/:id', requireAuth, async (req, res) => {
         }
 
         const recording = recordings[recordingIndex];
-        const filepath = path.join(RECORDINGS_DIR, recording.filename);
-
-        // Delete audio file
-        try {
-            await fs.unlink(filepath);
-        } catch (error) {
-            console.warn('Audio file not found for deletion:', error.message);
-        }
+        
+        // Mock delete audio file for Vercel
+        console.log('🚫 Mock: Would delete audio file:', recording.filename);
 
         // Remove from recordings array
         recordings.splice(recordingIndex, 1);
@@ -611,9 +541,8 @@ app.get('/admin', (req, res) => {
 // Initialize and start server
 async function startServer() {
     try {
-        // Create directories if they don't exist
-        await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-        await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+        // Mock directory creation for Vercel
+        console.log('🚫 Directory creation disabled for Vercel testing');
         
         // Initialize data file
         await initializeDataFile();
