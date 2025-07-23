@@ -6,6 +6,10 @@ class EnhancedAdminInterface {
         this.prompts = [];
         this.currentTab = 'overview';
         this.themes = new Set();
+        this.activePromptFilter = null;
+        this.sortField = 'date';
+        this.sortDirection = 'desc';
+        this.nextPrompt = null;
         this.init();
     }
 
@@ -46,15 +50,28 @@ class EnhancedAdminInterface {
             this.analyzeAllThemes();
         });
 
-        // Modal close
-        document.getElementById('modal-close')?.addEventListener('click', () => {
-            this.closeModal();
+        // Prompt management events
+        document.getElementById('add-prompt-btn')?.addEventListener('click', () => {
+            this.showAddPromptModal();
+        });
+
+        document.getElementById('add-prompt-close')?.addEventListener('click', () => {
+            this.closeAddPromptModal();
+        });
+
+        document.getElementById('cancel-prompt')?.addEventListener('click', () => {
+            this.closeAddPromptModal();
+        });
+
+        document.getElementById('add-prompt-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addNewPrompt();
         });
 
         // Close modal on background click
-        document.getElementById('prompt-modal')?.addEventListener('click', (e) => {
-            if (e.target.id === 'prompt-modal') {
-                this.closeModal();
+        document.getElementById('add-prompt-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'add-prompt-modal') {
+                this.closeAddPromptModal();
             }
         });
     }
@@ -143,8 +160,11 @@ class EnhancedAdminInterface {
     async loadAllData() {
         await Promise.all([
             this.loadRecordings(),
-            this.loadPromptAnalytics()
+            this.loadPrompts(),
+            this.loadNextPrompt()
         ]);
+        // Update stats after all data is loaded to ensure prompt count is correct
+        this.updateStats();
     }
 
     async loadTabData(tabName) {
@@ -156,7 +176,7 @@ class EnhancedAdminInterface {
                 this.renderRecordings();
                 break;
             case 'prompts':
-                this.renderPromptAnalytics();
+                this.renderPrompts();
                 break;
             case 'themes':
                 this.renderThemeExplorer();
@@ -170,7 +190,6 @@ class EnhancedAdminInterface {
             
             if (response.ok) {
                 this.recordings = await response.json();
-                this.updateStats();
                 if (this.currentTab === 'recordings') {
                     this.renderRecordings();
                 }
@@ -183,7 +202,7 @@ class EnhancedAdminInterface {
         }
     }
 
-    async loadPromptAnalytics() {
+    async loadPrompts() {
         try {
             const response = await fetch('/api/admin/prompts');
             
@@ -191,14 +210,40 @@ class EnhancedAdminInterface {
                 this.prompts = await response.json();
                 this.extractThemes();
                 if (this.currentTab === 'prompts') {
-                    this.renderPromptAnalytics();
+                    this.renderPrompts();
                 }
             } else {
-                this.showFeedback('Failed to load prompt analytics', 'error', 'prompts-feedback');
+                this.showFeedback('Failed to load prompts', 'error', 'prompts-feedback');
             }
         } catch (error) {
-            console.error('Error loading prompt analytics:', error);
-            this.showFeedback('Failed to load prompt analytics', 'error', 'prompts-feedback');
+            console.error('Error loading prompts:', error);
+            this.showFeedback('Failed to load prompts', 'error', 'prompts-feedback');
+        }
+    }
+
+    async loadNextPrompt() {
+        try {
+            const response = await fetch('/api/admin/prompts/next-peek');
+            
+            if (response.ok) {
+                const promptData = await response.json();
+                this.nextPrompt = promptData.text;
+                this.updateNextPromptDisplay();
+            } else {
+                this.nextPrompt = 'No active prompts available';
+                this.updateNextPromptDisplay();
+            }
+        } catch (error) {
+            console.error('Error loading next prompt:', error);
+            this.nextPrompt = 'Error loading prompt';
+            this.updateNextPromptDisplay();
+        }
+    }
+
+    updateNextPromptDisplay() {
+        const nextPromptElement = document.getElementById('next-prompt-text');
+        if (nextPromptElement) {
+            nextPromptElement.textContent = `"${this.nextPrompt}"`;
         }
     }
 
@@ -215,12 +260,14 @@ class EnhancedAdminInterface {
         const total = this.recordings.length;
         const approved = this.recordings.filter(r => r.approved).length;
         const pending = total - approved;
-        const totalPrompts = this.prompts.length;
+        const activePrompts = this.prompts.filter(p => p.active).length;
 
         document.getElementById('total-recordings').textContent = total;
         document.getElementById('approved-recordings').textContent = approved;
         document.getElementById('pending-recordings').textContent = pending;
-        document.getElementById('total-prompts').textContent = totalPrompts;
+        
+        // Update prompt count in tab if it exists
+        this.updatePromptCount(activePrompts);
     }
 
     renderOverview() {
@@ -275,27 +322,48 @@ class EnhancedAdminInterface {
         
         if (!tbody) return;
 
-        if (this.recordings.length === 0) {
+        // Apply prompt filter if active
+        let recordingsToShow = this.recordings;
+        if (this.activePromptFilter) {
+            recordingsToShow = this.recordings.filter(r => r.prompt === this.activePromptFilter);
+        }
+
+        if (recordingsToShow.length === 0) {
+            const message = this.activePromptFilter 
+                ? `No recordings found for prompt: "${this.activePromptFilter}"`
+                : 'No recordings found. Submit some recordings from the main app first.';
             tbody.innerHTML = `
                 <tr>
                     <td colspan="5" style="text-align: center; padding: 2rem; color: #718096;">
-                        No recordings found. Submit some recordings from the main app first.
+                        ${message}
                     </td>
                 </tr>
             `;
             return;
         }
 
-        // Sort by timestamp (newest first)
-        const sortedRecordings = [...this.recordings].sort((a, b) => 
-            new Date(b.timestamp) - new Date(a.timestamp)
-        );
+        // Sort recordings based on current sort settings
+        const sortedRecordings = this.sortRecordingsArray(recordingsToShow);
 
         tbody.innerHTML = '';
         sortedRecordings.forEach(recording => {
             const row = this.createRecordingRow(recording);
             tbody.appendChild(row);
         });
+        
+        // Update filter status
+        this.updateFilterStatus();
+    }
+
+    updatePromptCount(count = null) {
+        const badge = document.getElementById('prompt-count-badge');
+        if (badge) {
+            if (count === null) {
+                // Calculate from current prompts data
+                count = this.prompts ? this.prompts.filter(p => p.active).length : 0;
+            }
+            badge.textContent = count.toString();
+        }
     }
 
     createRecordingRow(recording) {
@@ -339,31 +407,64 @@ class EnhancedAdminInterface {
         return row;
     }
 
-    renderPromptAnalytics() {
-        const promptsGrid = document.getElementById('prompts-grid');
+    renderPrompts() {
+        const promptsTbody = document.getElementById('prompts-tbody');
         
-        if (!promptsGrid) return;
+        if (!promptsTbody) return;
 
         if (this.prompts.length === 0) {
-            promptsGrid.innerHTML = '<p style="text-align: center; color: #718096; padding: 2rem;">No prompts have responses yet.</p>';
+            promptsTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 2rem; color: #718096;">
+                        No prompts found. Add some prompts to get started.
+                    </td>
+                </tr>
+            `;
             return;
         }
 
-        promptsGrid.innerHTML = this.prompts.map(promptData => {
-            // Get themes for this prompt by analyzing its recordings
-            const themes = this.getPromptThemes(promptData.recordings);
+        // Sort prompts by order
+        const sortedPrompts = [...this.prompts].sort((a, b) => a.order - b.order);
+
+        promptsTbody.innerHTML = sortedPrompts.map(prompt => {
+            const statusBadge = prompt.active 
+                ? '<span class="status-badge status-approved">Active</span>'
+                : '<span class="status-badge status-pending">Paused</span>';
             
+            const recordingInfo = prompt.recordingCount > 0 
+                ? `${prompt.recordingCount} (${prompt.approvedCount} approved)`
+                : '0';
+
             return `
-                <div class="prompt-card" onclick="adminInterface.showPromptDetails('${promptData.prompt.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">
-                    <div class="prompt-title">${promptData.prompt}</div>
-                    <div class="prompt-stats">
-                        <div class="prompt-count">${promptData.count}</div>
-                        <div class="prompt-approved">${promptData.approvedCount} approved</div>
-                    </div>
-                    <div class="prompt-tags">
-                        ${themes.map(theme => `<span class="tag-pill">${theme}</span>`).join('')}
-                    </div>
-                </div>
+                <tr>
+                    <td>${prompt.order}</td>
+                    <td class="prompt-cell" title="${prompt.text}">${prompt.text}</td>
+                    <td>${statusBadge}</td>
+                    <td>${recordingInfo}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${prompt.active ? 
+                                `<button class="btn btn-small" style="background: #667eea; color: white;" 
+                                        onclick="adminInterface.queuePromptNext('${prompt.id}')">
+                                    Queue
+                                </button>` : ''
+                            }
+                            ${prompt.recordingCount > 0 ? 
+                                `<button class="btn btn-small btn-secondary" onclick="adminInterface.filterRecordingsByPrompt('${prompt.text.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">
+                                    View Recordings
+                                </button>` : ''
+                            }
+                            <button class="btn btn-small ${prompt.active ? 'btn-secondary' : 'btn-primary'}" 
+                                    onclick="adminInterface.togglePromptStatus('${prompt.id}', ${!prompt.active})">
+                                ${prompt.active ? 'Pause' : 'Activate'}
+                            </button>
+                            <button class="btn btn-small btn-danger" 
+                                    onclick="adminInterface.deletePrompt('${prompt.id}')">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
             `;
         }).join('');
     }
@@ -758,6 +859,207 @@ class EnhancedAdminInterface {
         setTimeout(() => {
             feedbackEl.classList.add('hidden');
         }, 3000);
+    }
+
+    // New methods for prompt filtering
+    filterRecordingsByPrompt(prompt) {
+        this.activePromptFilter = prompt;
+        this.switchTab('recordings');
+    }
+
+    clearPromptFilter() {
+        this.activePromptFilter = null;
+        this.renderRecordings();
+    }
+
+    updateFilterStatus() {
+        // Add filter status indicator
+        let filterStatus = document.getElementById('filter-status');
+        if (!filterStatus) {
+            const recordingsSection = document.querySelector('.recordings-section .section-header');
+            if (recordingsSection) {
+                filterStatus = document.createElement('div');
+                filterStatus.id = 'filter-status';
+                filterStatus.style.cssText = 'margin-top: 1rem; padding: 0.75rem; background: #e2e8f0; border-radius: 8px; font-size: 0.9rem;';
+                recordingsSection.appendChild(filterStatus);
+            }
+        }
+
+        if (filterStatus) {
+            if (this.activePromptFilter) {
+                filterStatus.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><strong>Filtered by prompt:</strong> "${this.activePromptFilter}"</span>
+                        <button class="btn btn-small btn-secondary" onclick="adminInterface.clearPromptFilter()">
+                            Clear Filter
+                        </button>
+                    </div>
+                `;
+                filterStatus.style.display = 'block';
+            } else {
+                filterStatus.style.display = 'none';
+            }
+        }
+    }
+
+    // Sorting functionality
+    sortRecordings(field) {
+        if (this.sortField === field) {
+            // Toggle direction if same field
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            // New field, default to ascending
+            this.sortField = field;
+            this.sortDirection = 'asc';
+        }
+        this.renderRecordings();
+    }
+
+    sortRecordingsArray(recordings) {
+        return [...recordings].sort((a, b) => {
+            let aVal, bVal;
+            
+            switch (this.sortField) {
+                case 'date':
+                    aVal = new Date(a.timestamp);
+                    bVal = new Date(b.timestamp);
+                    break;
+                case 'prompt':
+                    aVal = a.prompt.toLowerCase();
+                    bVal = b.prompt.toLowerCase();
+                    break;
+                case 'status':
+                    aVal = a.approved ? 'approved' : 'pending';
+                    bVal = b.approved ? 'approved' : 'pending';
+                    break;
+                default:
+                    return 0;
+            }
+            
+            if (aVal < bVal) return this.sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return this.sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    // Prompt Management Functions
+    showAddPromptModal() {
+        document.getElementById('add-prompt-modal').classList.remove('hidden');
+        document.getElementById('prompt-text').focus();
+    }
+
+    closeAddPromptModal() {
+        document.getElementById('add-prompt-modal').classList.add('hidden');
+        document.getElementById('add-prompt-form').reset();
+    }
+
+    async addNewPrompt() {
+        const promptText = document.getElementById('prompt-text').value.trim();
+        
+        if (!promptText) {
+            this.showFeedback('Please enter a prompt text', 'error', 'prompts-feedback');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/admin/prompts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: promptText })
+            });
+
+            if (response.ok) {
+                await this.loadPrompts();
+                await this.loadNextPrompt();
+                this.updateStats(); // Update the count badge
+                this.closeAddPromptModal();
+                this.showFeedback('Prompt added successfully', 'success', 'prompts-feedback');
+            } else {
+                const error = await response.json();
+                this.showFeedback(error.error || 'Failed to add prompt', 'error', 'prompts-feedback');
+            }
+        } catch (error) {
+            console.error('Error adding prompt:', error);
+            this.showFeedback('Failed to add prompt', 'error', 'prompts-feedback');
+        }
+    }
+
+    async togglePromptStatus(promptId, active) {
+        try {
+            const response = await fetch(`/api/admin/prompts/${promptId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ active })
+            });
+
+            if (response.ok) {
+                await this.loadPrompts();
+                await this.loadNextPrompt();
+                this.updateStats(); // Update the count badge
+                this.showFeedback(
+                    `Prompt ${active ? 'activated' : 'paused'} successfully`, 
+                    'success', 
+                    'prompts-feedback'
+                );
+            } else {
+                this.showFeedback('Failed to update prompt status', 'error', 'prompts-feedback');
+            }
+        } catch (error) {
+            console.error('Error updating prompt status:', error);
+            this.showFeedback('Failed to update prompt status', 'error', 'prompts-feedback');
+        }
+    }
+
+    async deletePrompt(promptId) {
+        if (!confirm('Are you sure you want to delete this prompt? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/prompts/${promptId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                await this.loadPrompts();
+                await this.loadNextPrompt();
+                this.updateStats(); // Update the count badge
+                this.showFeedback('Prompt deleted successfully', 'success', 'prompts-feedback');
+            } else {
+                this.showFeedback('Failed to delete prompt', 'error', 'prompts-feedback');
+            }
+        } catch (error) {
+            console.error('Error deleting prompt:', error);
+            this.showFeedback('Failed to delete prompt', 'error', 'prompts-feedback');
+        }
+    }
+
+    async queuePromptNext(promptId) {
+        try {
+            const response = await fetch(`/api/admin/prompts/${promptId}/queue-next`, {
+                method: 'PUT'
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                await this.loadNextPrompt(); // Update the next prompt display
+                this.showFeedback(
+                    `Prompt queued successfully! It will appear next.`, 
+                    'success', 
+                    'prompts-feedback'
+                );
+            } else {
+                const error = await response.json();
+                this.showFeedback(error.error || 'Failed to queue prompt', 'error', 'prompts-feedback');
+            }
+        } catch (error) {
+            console.error('Error queuing prompt:', error);
+            this.showFeedback('Failed to queue prompt', 'error', 'prompts-feedback');
+        }
     }
 }
 

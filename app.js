@@ -2,48 +2,41 @@
 
 class SoundsLikeHome {
     constructor() {
-        this.prompts = [
-            "Describe the sound of your childhood bedroom at night.",
-            "What does Sunday morning sound like in your home?",
-            "Share the soundtrack of someone you love cooking.",
-            "Tell us about a sound that makes you feel safe.",
-            "What does home sound like when it's raining?",
-            "Describe the first sound you remember from your childhood home.",
-            "What sound do you miss most from a place you used to live?",
-            "Share a sound that instantly transports you somewhere special.",
-            "What does your favorite room sound like when you're alone?",
-            "Describe a sound that means 'family' to you.",
-            "What does home sound like in the early morning?",
-            "Share a sound that makes you smile every time you hear it.",
-            "Describe the sound of welcome in your home.",
-            "What does comfort sound like to you?",
-            "Tell us about a sound that feels like a warm hug.",
-            "What sound makes your house feel like home?",
-            "Describe the sounds of a perfect evening at home.",
-            "What does love sound like in your daily life?",
-            "Share a sound that represents peace to you.",
-            "What does home sound like through the seasons?"
-        ];
-        
         this.recordings = [];
         this.currentRecording = null;
         this.mediaRecorder = null;
         this.recordingBlob = null;
         this.currentPrompt = null;
+        this.recordingTimer = null;
         
         this.init();
     }
     
     init() {
-        this.loadRandomPrompt();
+        this.loadPrompt();
         this.bindEvents();
+        this.loadBubbles();
     }
     
     // Prompt System
-    loadRandomPrompt() {
-        const randomIndex = Math.floor(Math.random() * this.prompts.length);
-        this.currentPrompt = this.prompts[randomIndex];
-        document.getElementById('current-prompt').textContent = this.currentPrompt;
+    async loadPrompt() {
+        try {
+            const response = await fetch('/api/prompts/next');
+            if (response.ok) {
+                const promptData = await response.json();
+                this.currentPrompt = promptData.text;
+                document.getElementById('current-prompt').textContent = this.currentPrompt;
+            } else {
+                // Fallback to a default prompt if API fails
+                this.currentPrompt = "What does home sound like to you?";
+                document.getElementById('current-prompt').textContent = this.currentPrompt;
+            }
+        } catch (error) {
+            console.error('Error loading prompt:', error);
+            // Fallback to a default prompt if API fails
+            this.currentPrompt = "What does home sound like to you?";
+            document.getElementById('current-prompt').textContent = this.currentPrompt;
+        }
     }
     
     // Event Binding
@@ -113,6 +106,15 @@ class SoundsLikeHome {
             this.mediaRecorder.start();
             this.updateRecordingUI(true);
             
+            // Start 90-second countdown timer and progress animation
+            this.startRecordingProgress();
+            this.recordingTimer = setTimeout(() => {
+                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    this.stopRecording();
+                    this.showFeedback('Recording automatically stopped after 90 seconds', 'info');
+                }
+            }, 90000); // 90 seconds
+            
         } catch (error) {
             console.error('Error accessing microphone:', error);
             alert('Unable to access microphone. Please check your permissions and try again.');
@@ -124,6 +126,15 @@ class SoundsLikeHome {
             this.mediaRecorder.stop();
             this.updateRecordingUI(false);
         }
+        
+        // Clear the timer if it exists
+        if (this.recordingTimer) {
+            clearTimeout(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+        
+        // Stop recording progress animation
+        this.stopRecordingProgress();
     }
     
     updateRecordingUI(isRecording) {
@@ -247,6 +258,9 @@ class SoundsLikeHome {
             audio.src = `/api/recordings/${recording.id}/audio`;
             audioPlayer.classList.remove('hidden');
             
+            // Setup progress tracking
+            this.setupAudioProgress(audio);
+            
             await audio.play();
             
             // Hide elements after playback
@@ -254,6 +268,7 @@ class SoundsLikeHome {
                 setTimeout(() => {
                     audioPlayer.classList.add('hidden');
                     listeningPrompt.classList.add('hidden');
+                    this.resetAudioProgress();
                 }, 2000);
             };
             
@@ -262,6 +277,106 @@ class SoundsLikeHome {
             this.showFeedback('Unable to play recording', 'error');
             // Hide prompt on error
             document.getElementById('listening-prompt').classList.add('hidden');
+        }
+    }
+    
+    setupAudioProgress(audio) {
+        const progressFill = document.getElementById('audio-progress-fill');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const totalTimeDisplay = document.getElementById('total-time');
+        const playPauseBtn = document.getElementById('audio-play-pause-btn');
+        const playIcon = playPauseBtn.querySelector('.play-icon');
+        const pauseIcon = playPauseBtn.querySelector('.pause-icon');
+        
+        // Setup play/pause button
+        playPauseBtn.onclick = () => {
+            if (audio.paused) {
+                audio.play();
+            } else {
+                audio.pause();
+            }
+        };
+        
+        // Update play/pause button state
+        audio.onplay = () => {
+            playIcon.classList.add('hidden');
+            pauseIcon.classList.remove('hidden');
+        };
+        
+        audio.onpause = () => {
+            playIcon.classList.remove('hidden');
+            pauseIcon.classList.add('hidden');
+        };
+        
+        // Update total duration when metadata loads
+        audio.onloadedmetadata = () => {
+            totalTimeDisplay.textContent = this.formatTime(audio.duration);
+        };
+        
+        // Update progress during playback
+        audio.ontimeupdate = () => {
+            if (audio.duration) {
+                const progress = (audio.currentTime / audio.duration) * 100;
+                progressFill.style.width = `${progress}%`;
+                currentTimeDisplay.textContent = this.formatTime(audio.currentTime);
+            }
+        };
+        
+        // Reset button state when audio ends
+        audio.onended = () => {
+            playIcon.classList.remove('hidden');
+            pauseIcon.classList.add('hidden');
+        };
+    }
+    
+    resetAudioProgress() {
+        const progressFill = document.getElementById('audio-progress-fill');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const totalTimeDisplay = document.getElementById('total-time');
+        
+        progressFill.style.width = '0%';
+        currentTimeDisplay.textContent = '0:00';
+        totalTimeDisplay.textContent = '0:00';
+    }
+    
+    formatTime(seconds) {
+        if (isNaN(seconds)) return '0:00';
+        
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    
+    startRecordingProgress() {
+        const progressFill = document.getElementById('recording-progress-fill');
+        if (!progressFill) return;
+        
+        // Reset progress
+        progressFill.style.width = '0%';
+        
+        // Start progress animation
+        this.recordingStartTime = Date.now();
+        this.recordingProgressInterval = setInterval(() => {
+            const elapsed = Date.now() - this.recordingStartTime;
+            const progress = Math.min((elapsed / 90000) * 100, 100); // 90 seconds = 100%
+            progressFill.style.width = `${progress}%`;
+            
+            if (progress >= 100) {
+                this.stopRecordingProgress();
+            }
+        }, 100); // Update every 100ms
+    }
+    
+    stopRecordingProgress() {
+        if (this.recordingProgressInterval) {
+            clearInterval(this.recordingProgressInterval);
+            this.recordingProgressInterval = null;
+        }
+        
+        // Reset progress
+        const progressFill = document.getElementById('recording-progress-fill');
+        if (progressFill) {
+            progressFill.style.width = '0%';
         }
     }
     
@@ -277,6 +392,67 @@ class SoundsLikeHome {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
+    }
+    
+    // Bubble System
+    async loadBubbles() {
+        try {
+            const response = await fetch('/api/recordings/count');
+            if (response.ok) {
+                const data = await response.json();
+                this.generateBubbles(data.count);
+            } else {
+                // Generate a few default bubbles if API fails
+                this.generateBubbles(3);
+            }
+        } catch (error) {
+            console.error('Error loading bubble count:', error);
+            this.generateBubbles(3);
+        }
+    }
+    
+    generateBubbles(count) {
+        const container = document.getElementById('bubbles-container');
+        if (!container) return;
+        
+        container.innerHTML = ''; // Clear existing bubbles
+        
+        // Generate bubbles based on recording count (max 22 for visual appeal)
+        const bubbleCount = Math.min(count, 22);
+        const containerWidth = container.offsetWidth || 400;
+        const containerHeight = container.offsetHeight || 200;
+        
+        for (let i = 0; i < bubbleCount; i++) {
+            const bubble = this.createBubble(containerWidth, containerHeight);
+            container.appendChild(bubble);
+        }
+    }
+    
+    createBubble(containerWidth, containerHeight) {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        
+        // Random size
+        const sizes = ['bubble-small', 'bubble-medium', 'bubble-large'];
+        const sizeClass = sizes[Math.floor(Math.random() * sizes.length)];
+        bubble.classList.add(sizeClass);
+        
+        // Random position
+        const margin = 30;
+        const left = Math.random() * (containerWidth - margin * 2) + margin;
+        const top = Math.random() * (containerHeight - margin * 2) + margin;
+        
+        bubble.style.left = `${left}px`;
+        bubble.style.top = `${top}px`;
+        
+        // Random animation delay and duration
+        const delay = Math.random() * 5;
+        const duration = 8 + Math.random() * 4; // 8-12 seconds
+        
+        bubble.style.animationDelay = `${delay}s`;
+        bubble.style.animationDuration = `${duration}s`;
+        
+        return bubble;
     }
     
     

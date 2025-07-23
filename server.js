@@ -4,9 +4,12 @@ const session = require('express-session');
 const fs = require('fs').promises;
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -15,15 +18,21 @@ app.use(express.static('.'));
 
 // Session configuration
 app.use(session({
-    secret: 'sounds-like-home-secret-key',
+    secret: process.env.SESSION_SECRET || 'sounds-like-home-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+    cookie: { 
+        secure: IS_PRODUCTION, // Use secure cookies in production
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        httpOnly: true
+    }
 }));
 
 // File storage paths
 const RECORDINGS_DIR = path.join(__dirname, 'recordings');
 const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
+const PROMPTS_FILE = path.join(__dirname, 'data', 'prompts.json');
+const PROMPT_STATE_FILE = path.join(__dirname, 'data', 'prompt-state.json');
 
 // Initialize data file if it doesn't exist
 async function initializeDataFile() {
@@ -51,6 +60,108 @@ async function saveRecordings(recordings) {
     } catch (error) {
         console.error('Error saving recordings:', error);
         throw error;
+    }
+}
+
+// Prompt management functions
+async function loadPrompts() {
+    try {
+        const data = await fs.readFile(PROMPTS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading prompts:', error);
+        return [];
+    }
+}
+
+async function savePrompts(prompts) {
+    try {
+        await fs.writeFile(PROMPTS_FILE, JSON.stringify(prompts, null, 2));
+        console.log('📝 Prompts saved to file');
+    } catch (error) {
+        console.error('Error saving prompts:', error);
+        throw error;
+    }
+}
+
+// Prompt queue state management functions
+async function loadPromptState() {
+    try {
+        const data = await fs.readFile(PROMPT_STATE_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading prompt state:', error);
+        return { currentPromptIndex: 0, lastUpdated: new Date().toISOString() };
+    }
+}
+
+async function savePromptState(state) {
+    try {
+        await fs.writeFile(PROMPT_STATE_FILE, JSON.stringify(state, null, 2));
+    } catch (error) {
+        console.error('Error saving prompt state:', error);
+        throw error;
+    }
+}
+
+async function getNextPromptInSequence() {
+    try {
+        const prompts = await loadPrompts();
+        const activePrompts = prompts.filter(p => p.active).sort((a, b) => a.order - b.order);
+        
+        if (activePrompts.length === 0) {
+            throw new Error('No active prompts available');
+        }
+
+        const state = await loadPromptState();
+        let currentIndex = state.currentPromptIndex;
+        
+        // Ensure the index is within bounds
+        if (currentIndex >= activePrompts.length) {
+            currentIndex = 0;
+        }
+
+        const currentPrompt = activePrompts[currentIndex];
+        const nextIndex = (currentIndex + 1) % activePrompts.length;
+        const nextPrompt = activePrompts[nextIndex];
+
+        // Advance to the next prompt for subsequent calls
+        await savePromptState({
+            currentPromptIndex: nextIndex,
+            lastUpdated: new Date().toISOString()
+        });
+
+        return {
+            current: currentPrompt,
+            next: nextPrompt
+        };
+    } catch (error) {
+        console.error('Error getting next prompt in sequence:', error);
+        throw error;
+    }
+}
+
+async function peekNextPromptInSequence() {
+    try {
+        const prompts = await loadPrompts();
+        const activePrompts = prompts.filter(p => p.active).sort((a, b) => a.order - b.order);
+        
+        if (activePrompts.length === 0) {
+            return null;
+        }
+
+        const state = await loadPromptState();
+        let currentIndex = state.currentPromptIndex;
+        
+        // Ensure the index is within bounds
+        if (currentIndex >= activePrompts.length) {
+            currentIndex = 0;
+        }
+
+        return activePrompts[currentIndex];
+    } catch (error) {
+        console.error('Error peeking next prompt:', error);
+        return null;
     }
 }
 
@@ -173,6 +284,86 @@ app.post('/api/recordings', async (req, res) => {
     }
 });
 
+// Get next prompt for recording (sequential)
+app.get('/api/prompts/next', async (req, res) => {
+    try {
+        const promptData = await getNextPromptInSequence();
+        
+        res.json({
+            id: promptData.current.id,
+            text: promptData.current.text,
+            next: promptData.next.text
+        });
+    } catch (error) {
+        console.error('Error getting next prompt:', error);
+        res.status(500).json({ error: 'Failed to get prompt' });
+    }
+});
+
+// Peek at next prompt without advancing queue (admin only)
+app.get('/api/admin/prompts/next-peek', requireAuth, async (req, res) => {
+    try {
+        const nextPrompt = await peekNextPromptInSequence();
+        
+        if (!nextPrompt) {
+            return res.status(404).json({ error: 'No active prompts available' });
+        }
+        
+        res.json({
+            id: nextPrompt.id,
+            text: nextPrompt.text
+        });
+    } catch (error) {
+        console.error('Error peeking next prompt:', error);
+        res.status(500).json({ error: 'Failed to peek next prompt' });
+    }
+});
+
+// Queue a specific prompt to be next (admin only)
+app.put('/api/admin/prompts/:id/queue-next', requireAuth, async (req, res) => {
+    try {
+        const prompts = await loadPrompts();
+        const activePrompts = prompts.filter(p => p.active).sort((a, b) => a.order - b.order);
+        
+        if (activePrompts.length === 0) {
+            return res.status(404).json({ error: 'No active prompts available' });
+        }
+
+        // Find the index of the requested prompt
+        const promptIndex = activePrompts.findIndex(p => p.id === req.params.id);
+        if (promptIndex === -1) {
+            return res.status(404).json({ error: 'Prompt not found or not active' });
+        }
+
+        // Set this prompt as the next one in the queue
+        await savePromptState({
+            currentPromptIndex: promptIndex,
+            lastUpdated: new Date().toISOString()
+        });
+
+        res.json({ 
+            success: true, 
+            message: `Prompt "${activePrompts[promptIndex].text}" is now next in queue`,
+            prompt: activePrompts[promptIndex]
+        });
+    } catch (error) {
+        console.error('Error queuing prompt:', error);
+        res.status(500).json({ error: 'Failed to queue prompt' });
+    }
+});
+
+// Get recordings count for bubble generation
+app.get('/api/recordings/count', async (req, res) => {
+    try {
+        const recordings = await loadRecordings();
+        const approvedRecordings = recordings.filter(r => r.approved);
+        res.json({ count: approvedRecordings.length });
+    } catch (error) {
+        console.error('Error getting recordings count:', error);
+        res.status(500).json({ error: 'Failed to get recordings count' });
+    }
+});
+
 // Get random recording for listening
 app.get('/api/recordings/random', async (req, res) => {
     try {
@@ -238,7 +429,7 @@ app.get('/api/recordings/:id/audio', async (req, res) => {
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
     
-    if (password === 'welcomeadmin') {
+    if (password === (process.env.ADMIN_PASSWORD || 'welcomeadmin')) {
         req.session.authenticated = true;
         res.json({ success: true });
     } else {
@@ -260,6 +451,101 @@ app.get('/api/admin/recordings', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error getting recordings:', error);
         res.status(500).json({ error: 'Failed to get recordings' });
+    }
+});
+
+// Get all prompts with analytics (admin only)
+app.get('/api/admin/prompts', requireAuth, async (req, res) => {
+    try {
+        const prompts = await loadPrompts();
+        const recordings = await loadRecordings();
+        
+        // Create analytics for each prompt
+        const promptsWithAnalytics = prompts.map(prompt => {
+            const promptRecordings = recordings.filter(r => r.prompt === prompt.text);
+            return {
+                ...prompt,
+                recordingCount: promptRecordings.length,
+                approvedCount: promptRecordings.filter(r => r.approved).length,
+                recordings: promptRecordings
+            };
+        });
+        
+        res.json(promptsWithAnalytics);
+    } catch (error) {
+        console.error('Error getting prompts:', error);
+        res.status(500).json({ error: 'Failed to get prompts' });
+    }
+});
+
+// Add new prompt (admin only)
+app.post('/api/admin/prompts', requireAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Prompt text is required' });
+        }
+        
+        const prompts = await loadPrompts();
+        const maxOrder = Math.max(...prompts.map(p => p.order), 0);
+        
+        const newPrompt = {
+            id: uuidv4(),
+            text: text.trim(),
+            active: true,
+            order: maxOrder + 1,
+            createdAt: new Date().toISOString()
+        };
+        
+        prompts.push(newPrompt);
+        await savePrompts(prompts);
+        
+        res.json({ success: true, prompt: newPrompt });
+    } catch (error) {
+        console.error('Error adding prompt:', error);
+        res.status(500).json({ error: 'Failed to add prompt' });
+    }
+});
+
+// Update prompt (admin only)
+app.put('/api/admin/prompts/:id', requireAuth, async (req, res) => {
+    try {
+        const { text, active } = req.body;
+        const prompts = await loadPrompts();
+        const promptIndex = prompts.findIndex(p => p.id === req.params.id);
+        
+        if (promptIndex === -1) {
+            return res.status(404).json({ error: 'Prompt not found' });
+        }
+        
+        if (text !== undefined) prompts[promptIndex].text = text.trim();
+        if (active !== undefined) prompts[promptIndex].active = active;
+        
+        await savePrompts(prompts);
+        res.json({ success: true, prompt: prompts[promptIndex] });
+    } catch (error) {
+        console.error('Error updating prompt:', error);
+        res.status(500).json({ error: 'Failed to update prompt' });
+    }
+});
+
+// Delete prompt (admin only)
+app.delete('/api/admin/prompts/:id', requireAuth, async (req, res) => {
+    try {
+        const prompts = await loadPrompts();
+        const promptIndex = prompts.findIndex(p => p.id === req.params.id);
+        
+        if (promptIndex === -1) {
+            return res.status(404).json({ error: 'Prompt not found' });
+        }
+        
+        prompts.splice(promptIndex, 1);
+        await savePrompts(prompts);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting prompt:', error);
+        res.status(500).json({ error: 'Failed to delete prompt' });
     }
 });
 
@@ -332,11 +618,48 @@ async function startServer() {
         // Initialize data file
         await initializeDataFile();
         
-        app.listen(PORT, () => {
-            console.log(`🎵 Sounds Like Home server running on http://localhost:${PORT}`);
-            console.log(`🔧 Admin interface available at http://localhost:${PORT}/admin`);
-            console.log(`📁 Recordings stored in: ${RECORDINGS_DIR}`);
-        });
+        if (IS_PRODUCTION) {
+            // Production: Run on HTTP only (Vercel handles HTTPS)
+            app.listen(PORT, () => {
+                console.log(`🎵 Sounds Like Home server running on port ${PORT}`);
+                console.log(`🔧 Admin interface available at /admin`);
+                console.log(`📁 Recordings stored in: ${RECORDINGS_DIR}`);
+            });
+        } else {
+            // Development: Use HTTPS with SSL certificates
+            try {
+                const sslOptions = {
+                    key: await fs.readFile(path.join(__dirname, 'key.pem')),
+                    cert: await fs.readFile(path.join(__dirname, 'cert.pem'))
+                };
+
+                // HTTP redirect middleware for development
+                app.use((req, res, next) => {
+                    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+                        return next();
+                    }
+                    res.redirect(`https://${req.headers.host.replace(':' + PORT, ':' + HTTPS_PORT)}${req.url}`);
+                });
+
+                // Start HTTP server (redirect to HTTPS)
+                app.listen(PORT, 'localhost', () => {
+                    console.log(`🔄 HTTP server running on http://localhost:${PORT} (redirects to HTTPS)`);
+                });
+
+                // Start HTTPS server
+                https.createServer(sslOptions, app).listen(HTTPS_PORT, 'localhost', () => {
+                    console.log(`🎵 Sounds Like Home HTTPS server running on https://localhost:${HTTPS_PORT}`);
+                    console.log(`🔧 Admin interface available at https://localhost:${HTTPS_PORT}/admin`);
+                    console.log(`📁 Recordings stored in: ${RECORDINGS_DIR}`);
+                });
+            } catch (sslError) {
+                console.log('SSL certificates not found, running HTTP only');
+                app.listen(PORT, 'localhost', () => {
+                    console.log(`🎵 Sounds Like Home server running on http://localhost:${PORT}`);
+                    console.log(`🔧 Admin interface available at http://localhost:${PORT}/admin`);
+                });
+            }
+        }
     } catch (error) {
         console.error('Failed to start server:', error);
         process.exit(1);

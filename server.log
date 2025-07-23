@@ -1,101 +1,13 @@
-🎵 Sounds Like Home server running on http://localhost:3000
-🔧 Admin interface available at http://localhost:3000/admin
+
+> sounds-like-home@1.0.0 start
+> node server.js
+
+🔄 HTTP server running on http://0.0.0.0:3000 (redirects to HTTPS)
+🎵 Sounds Like Home HTTPS server running on https://0.0.0.0:3443
+🔧 Admin interface available at https://0.0.0.0:3443/admin
 📁 Recordings stored in: /mnt/c/Users/Brett A McCall/Documents/claudcodeproject/recordings
-GET /admin
-GET /admin.js
-GET /api/admin/recordings
-GET /api/admin/prompts
-GET /api/admin/recordings
-POST /api/admin/recordings/by-prompt
-GET /api/recordings/ae2a541a-994c-4b55-8c6f-69ae33527601/audio
-GET /favicon.ico
-POST /api/admin/auto-tag
-PUT /api/admin/recordings/ae2a541a-994c-4b55-8c6f-69ae33527601
-GET /
-GET /styles.css
-GET /app.js
-POST /api/recordings
-📝 Received recording submission request
-Request body keys: [ 'audioData', 'prompt', 'timestamp' ]
-Audio data type: string
-Audio data length: 381499
-Prompt: What does comfort sound like to you?
-📁 Saving to filepath: /mnt/c/Users/Brett A McCall/Documents/claudcodeproject/recordings/recording-ee77573a-e025-4ffb-99d6-d9c764c760a7.webm
-📂 RECORDINGS_DIR: /mnt/c/Users/Brett A McCall/Documents/claudcodeproject/recordings
-✅ Recordings directory confirmed/created
-🔍 Original audioData starts with: data:audio/webm;codecs=opus;base64,GkXfo59ChoEBQve
-🔄 Base64 data length after processing: 381464
-🔍 First 50 chars of base64: GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGF
-💾 Audio buffer size: 286097 bytes
-🔍 Audio buffer hex header: 1a45dfa39f4286810142f7810142f281
-✅ Valid WebM header detected
-✅ Audio file saved successfully
-📊 File stats - Size: 286097 bytes
-📋 Recording metadata: {
-  id: 'ee77573a-e025-4ffb-99d6-d9c764c760a7',
-  filename: 'recording-ee77573a-e025-4ffb-99d6-d9c764c760a7.webm',
-  prompt: 'What does comfort sound like to you?',
-  timestamp: '2025-07-20T19:29:23.121Z',
-  tags: [],
-  approved: true,
-  duration: 50
-}
-📚 Loaded existing recordings count: 2
-✅ Recording metadata saved to JSON
-🎉 Recording saved successfully with ID: ee77573a-e025-4ffb-99d6-d9c764c760a7
-GET /api/recordings/random
-GET /api/recordings/ae2a541a-994c-4b55-8c6f-69ae33527601/audio
-GET /favicon.ico
-GET /api/recordings/random
-GET /api/recordings/random
-GET /api/recordings/ee77573a-e025-4ffb-99d6-d9c764c760a7/audio
-GET /api/recordings/random
-GET /api/recordings/random
-GET /api/recordings/random
-GET /api/recordings/random
-GET /api/recordings/random
-GET /api/recordings/ae2a541a-994c-4b55-8c6f-69ae33527601/audio
-GET /admin
-GET /admin.js
-GET /api/admin/recordings
-GET /api/admin/recordings
-GET /api/admin/prompts
-POST /api/admin/auto-tag
-PUT /api/admin/recordings/ee77573a-e025-4ffb-99d6-d9c764c760a7
-GET /
-GET /styles.css
-GET /app.js
-GET /admin
-GET /admin.js
-GET /api/admin/recordings
-GET /api/admin/recordings
-GET /api/admin/prompts
-POST /api/recordings
-📝 Received recording submission request
-Request body keys: [ 'audioData', 'prompt', 'timestamp' ]
-Audio data type: string
-Audio data length: 400819
-Prompt: Share a sound that instantly transports you somewhere special.
-📁 Saving to filepath: /mnt/c/Users/Brett A McCall/Documents/claudcodeproject/recordings/recording-7a55689a-6d01-49d3-8038-ee62137732cc.webm
-📂 RECORDINGS_DIR: /mnt/c/Users/Brett A McCall/Documents/claudcodeproject/recordings
-✅ Recordings directory confirmed/created
-🔍 Original audioData starts with: data:audio/webm;codecs=opus;base64,GkXfo59ChoEBQve
-🔄 Base64 data length after processing: 400784
-🔍 First 50 chars of base64: GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGF
-💾 Audio buffer size: 300587 bytes
-🔍 Audio buffer hex header: 1a45dfa39f4286810142f7810142f281
-✅ Valid WebM header detected
-✅ Audio file saved successfully
-📊 File stats - Size: 300587 bytes
-📋 Recording metadata: {
-  id: '7a55689a-6d01-49d3-8038-ee62137732cc',
-  filename: 'recording-7a55689a-6d01-49d3-8038-ee62137732cc.webm',
-  prompt: 'Share a sound that instantly transports you somewhere special.',
-  timestamp: '2025-07-20T22:09:30.824Z',
-  tags: [],
-  approved: true,
-  duration: 53
-}
-📚 Loaded existing recordings count: 3
-✅ Recording metadata saved to JSON
-🎉 Recording saved successfully with ID: 7a55689a-6d01-49d3-8038-ee62137732cc
+📝 Prompts saved to file
+📝 Prompts saved to file
+📝 Prompts saved to file
+📝 Prompts saved to file
+📝 Prompts saved to file

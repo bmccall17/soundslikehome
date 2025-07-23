@@ -629,7 +629,10 @@
             <div class="admin-nav">
                 <button class="nav-btn active" data-tab="overview">Overview</button>
                 <button class="nav-btn" data-tab="recordings">All Recordings</button>
-                <button class="nav-btn" data-tab="prompts">Prompt Analytics</button>
+                <button class="nav-btn" data-tab="prompts">
+                    Prompts 
+                    <span id="prompt-count-badge" style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.7rem; margin-left: 0.5rem;">0</span>
+                </button>
                 <button class="nav-btn" data-tab="themes">Theme Explorer</button>
             </div>
 
@@ -647,10 +650,6 @@
                     <div class="stat-card">
                         <div class="stat-number" id="pending-recordings">0</div>
                         <div class="stat-label">Pending Review</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="total-prompts">0</div>
-                        <div class="stat-label">Active Prompts</div>
                     </div>
                 </div>
 
@@ -676,10 +675,16 @@
                     <table class="recordings-table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Prompt</th>
+                                <th>
+                                    <span onclick="adminInterface.sortRecordings('date')" style="cursor: pointer;">Date ↕️</span>
+                                </th>
+                                <th>
+                                    <span onclick="adminInterface.sortRecordings('prompt')" style="cursor: pointer;">Prompt ↕️</span>
+                                </th>
                                 <th>Tags</th>
-                                <th>Status</th>
+                                <th>
+                                    <span onclick="adminInterface.sortRecordings('status')" style="cursor: pointer;">Status ↕️</span>
+                                </th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -690,14 +695,38 @@
                 </div>
             </div>
 
-            <!-- Prompt Analytics Tab -->
+            <!-- Prompts Tab -->
             <div class="tab-content" id="prompts-tab">
                 <div class="prompts-section">
-                    <h3>Prompt Analytics</h3>
-                    <div id="prompts-feedback" class="feedback hidden"></div>
-                    <div class="prompts-grid" id="prompts-grid">
-                        <!-- Prompt cards will be populated here -->
+                    <div class="section-header">
+                        <h3>Prompts Management</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" id="add-prompt-btn">Add New Prompt</button>
+                        </div>
                     </div>
+                    <div id="prompts-feedback" class="feedback hidden"></div>
+                    
+                    <!-- Next Prompt Indicator -->
+                    <div id="next-prompt-indicator" style="background: #e2e8f0; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #2d3748;">Next Prompt in Queue</h4>
+                        <div id="next-prompt-text" style="font-style: italic; color: #4a5568;">Loading...</div>
+                    </div>
+
+                    <!-- Prompts Table -->
+                    <table class="recordings-table">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Prompt Text</th>
+                                <th>Status</th>
+                                <th>Recordings</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="prompts-tbody">
+                            <!-- Prompts will be populated here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -718,25 +747,24 @@
                 </div>
             </div>
 
-            <!-- Prompt Detail Modal -->
-            <div class="modal hidden" id="prompt-modal">
+            <!-- Add Prompt Modal -->
+            <div class="modal hidden" id="add-prompt-modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 id="modal-prompt-title">Prompt Recordings</h3>
-                        <button class="modal-close" id="modal-close">&times;</button>
+                        <h3>Add New Prompt</h3>
+                        <button class="modal-close" id="add-prompt-close">&times;</button>
                     </div>
                     <div class="modal-body">
-                        <div class="modal-stats">
-                            <span class="modal-stat">
-                                <strong id="modal-total-count">0</strong> total recordings
-                            </span>
-                            <span class="modal-stat">
-                                <strong id="modal-approved-count">0</strong> approved
-                            </span>
-                        </div>
-                        <div class="modal-recordings" id="modal-recordings">
-                            <!-- Prompt-specific recordings will be shown here -->
-                        </div>
+                        <form id="add-prompt-form">
+                            <div class="form-group">
+                                <label for="prompt-text" class="form-label">Prompt Text</label>
+                                <textarea id="prompt-text" class="form-input" rows="3" placeholder="Enter your prompt text..." required></textarea>
+                            </div>
+                            <div class="action-buttons" style="justify-content: flex-end; margin-top: 1.5rem;">
+                                <button type="button" class="btn btn-secondary" id="cancel-prompt">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Prompt</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

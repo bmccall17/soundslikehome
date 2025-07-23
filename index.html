@@ -29,8 +29,15 @@
                 </div>
                 
                 <div class="recording-indicator hidden" id="recording-indicator">
-                    <div class="pulse-circle"></div>
-                    <span class="recording-text">Recording...</span>
+                    <div class="recording-info">
+                        <div class="pulse-circle"></div>
+                        <span class="recording-text">Recording...</span>
+                    </div>
+                    <div class="recording-progress-container">
+                        <div class="recording-progress-bar">
+                            <div class="recording-progress-fill" id="recording-progress-fill"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -38,6 +45,23 @@
                 <button class="listen-btn" id="listen-btn">Listen</button>
                 <div class="listening-prompt hidden" id="listening-prompt">
                     <p class="listening-prompt-text" id="listening-prompt-text"></p>
+                    <div class="audio-progress-container" id="audio-progress-container">
+                        <div class="audio-controls">
+                            <button class="audio-play-pause-btn" id="audio-play-pause-btn">
+                                <span class="play-icon">▶</span>
+                                <span class="pause-icon hidden">⏸</span>
+                            </button>
+                            <div class="audio-progress-bar">
+                                <div class="audio-progress-fill" id="audio-progress-fill"></div>
+                            </div>
+                        </div>
+                        <div class="audio-time-display">
+                            <span id="current-time">0:00</span> / <span id="total-time">0:00</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bubbles-container" id="bubbles-container">
+                    <!-- Bubbles will be generated dynamically -->
                 </div>
             </div>
         </main>

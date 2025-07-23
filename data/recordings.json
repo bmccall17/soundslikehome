@@ -1,14 +1,5 @@
 [
   {
-    "id": "f3406ba9-a67c-4607-a6d6-0e13b098c638",
-    "filename": "recording-f3406ba9-a67c-4607-a6d6-0e13b098c638.webm",
-    "prompt": "Test recording",
-    "timestamp": "2024-01-01T00:00:00.000Z",
-    "tags": [],
-    "approved": false,
-    "duration": 52
-  },
-  {
     "id": "ae2a541a-994c-4b55-8c6f-69ae33527601",
     "filename": "recording-ae2a541a-994c-4b55-8c6f-69ae33527601.webm",
     "prompt": "Describe the sound of welcome in your home.",
@@ -42,5 +33,51 @@
     "tags": [],
     "approved": true,
     "duration": 53
+  },
+  {
+    "id": "e915ef9a-e56c-4445-9904-092811377cc2",
+    "filename": "recording-e915ef9a-e56c-4445-9904-092811377cc2.webm",
+    "prompt": "Share the soundtrack of someone you love cooking.",
+    "timestamp": "2025-07-22T23:45:44.525Z",
+    "tags": [
+      "music",
+      "Diana"
+    ],
+    "approved": true,
+    "duration": 41
+  },
+  {
+    "id": "a34f7168-04a6-48fa-9737-7e6e1700c858",
+    "filename": "recording-a34f7168-04a6-48fa-9737-7e6e1700c858.webm",
+    "prompt": "What does home sound like when it's raining?",
+    "timestamp": "2025-07-22T23:59:52.898Z",
+    "tags": [
+      "tin roof",
+      "nostalgia"
+    ],
+    "approved": true,
+    "duration": 64
+  },
+  {
+    "id": "8ddffc56-3a7d-4e87-b27f-93e7e7c97358",
+    "filename": "recording-8ddffc56-3a7d-4e87-b27f-93e7e7c97358.webm",
+    "prompt": "Tell us about a sound that feels like a warm hug.",
+    "timestamp": "2025-07-23T00:58:07.554Z",
+    "tags": [],
+    "approved": true,
+    "duration": 60
+  },
+  {
+    "id": "3bb52c92-bbe5-40d9-a664-a1bc7d268389",
+    "filename": "recording-3bb52c92-bbe5-40d9-a664-a1bc7d268389.webm",
+    "prompt": "What sound makes your house feel like home?",
+    "timestamp": "2025-07-23T01:01:50.025Z",
+    "tags": [
+      "dancing",
+      "people",
+      "food"
+    ],
+    "approved": true,
+    "duration": 36
   }
 ]
