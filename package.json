@@ -2,12 +2,12 @@
   "name": "sounds-like-home",
   "version": "1.0.0",
   "description": "A web application for recording and sharing what 'home' sounds like",
-  "main": "server.js",
+  "main": "api/index.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "vercel dev",
     "build": "echo 'No build step required'",
-    "vercel-build": "echo 'No build step required for Vercel'"
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -16,7 +16,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "vercel": "^33.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
