@@ -1,7 +1,8 @@
-<img width="462" height="717" alt="image" src="https://github.com/user-attachments/assets/bfc1c3c5-c42f-4056-9493-1ce07e932646" />
-<img width="1185" height="943" alt="image" src="https://github.com/user-attachments/assets/b4d1159e-4269-4dde-8717-5571cce8d0e6" />
+<img width="36%" height="717" alt="image" src="https://github.com/user-attachments/assets/bfc1c3c5-c42f-4056-9493-1ce07e932646" />
+<img width="63%" height="943" alt="image" src="https://github.com/user-attachments/assets/b4d1159e-4269-4dde-8717-5571cce8d0e6" />
 <br>
-# Sounds Like Home 🎵
+
+## Sounds Like Home 🎵
 
 A web application where users can record and listen to audio responses about what "home" sounds like to them. Features a sequential prompt system and beautiful rainbow bubble visualizations.
 
