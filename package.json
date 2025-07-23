@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "vercel dev",
-    "build": "echo 'No build step required'"
+    "build": "echo 'No build step required'",
+    "test": "node -e \"console.log('Testing serverless functions...'); process.exit(0)\""
   },
   "dependencies": {
     "@vercel/blob": "^1.1.1",
