@@ -79,5 +79,14 @@
     ],
     "approved": true,
     "duration": 36
+  },
+  {
+    "id": "f5ce4385-2736-4a47-a284-60d1b2d1598a",
+    "filename": "recording-f5ce4385-2736-4a47-a284-60d1b2d1598a.webm",
+    "prompt": "this is a new prompt for testing purposes.",
+    "timestamp": "2025-07-23T01:53:06.855Z",
+    "tags": [],
+    "approved": true,
+    "duration": 32
   }
 ]
