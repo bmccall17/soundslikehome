@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const https = require('https');
+const { put, del, list } = require('@vercel/blob');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,17 +29,42 @@ app.use(session({
     }
 }));
 
-// File storage paths
-const RECORDINGS_DIR = path.join(__dirname, 'recordings');
+// Vercel Blob storage configuration
+const BLOB_STORE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
 const PROMPTS_FILE = path.join(__dirname, 'data', 'prompts.json');
 const PROMPT_STATE_FILE = path.join(__dirname, 'data', 'prompt-state.json');
+
+// Blob storage helper functions
+async function uploadToBlob(filename, buffer, contentType = 'audio/webm') {
+    try {
+        const blob = await put(filename, buffer, {
+            access: 'public',
+            contentType: contentType,
+            token: BLOB_STORE_TOKEN
+        });
+        return blob;
+    } catch (error) {
+        console.error('Error uploading to blob:', error);
+        throw error;
+    }
+}
+
+async function deleteFromBlob(url) {
+    try {
+        await del(url, { token: BLOB_STORE_TOKEN });
+    } catch (error) {
+        console.error('Error deleting from blob:', error);
+        throw error;
+    }
+}
 
 // Initialize data file if it doesn't exist
 async function initializeDataFile() {
     try {
         await fs.access(DATA_FILE);
     } catch {
+        await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
         await fs.writeFile(DATA_FILE, JSON.stringify([], null, 2));
     }
 }
@@ -203,44 +229,34 @@ app.post('/api/recordings', async (req, res) => {
 
         // Generate unique ID and filename
         const id = uuidv4();
-        const filename = `recording-${id}.webm`;
-        const filepath = path.join(RECORDINGS_DIR, filename);
+        const filename = `recordings/recording-${id}.webm`;
         
-        console.log('📁 Saving to filepath:', filepath);
-        console.log('📂 RECORDINGS_DIR:', RECORDINGS_DIR);
+        console.log('📁 Uploading to Vercel Blob:', filename);
+        console.log('📊 Audio data received:', audioData ? audioData.length : 0, 'characters');
 
-        try {
-            // Check if recordings directory exists and create if needed
-            await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-            console.log('✅ Recordings directory confirmed/created');
-        } catch (dirError) {
-            console.error('❌ Error with recordings directory:', dirError);
-            throw dirError;
-        }
-
-        // Convert base64 to buffer and save file
+        // Convert base64 to buffer
         const base64Data = audioData.replace(/^data:audio\/[^;]+;base64,/, '');
         console.log('🔄 Base64 data length after processing:', base64Data.length);
         
         const audioBuffer = Buffer.from(base64Data, 'base64');
         console.log('💾 Audio buffer size:', audioBuffer.length, 'bytes');
         
+        // Upload to Vercel Blob storage
+        let blobUrl;
         try {
-            await fs.writeFile(filepath, audioBuffer);
-            console.log('✅ Audio file saved successfully');
-            
-            // Verify file was written
-            const stats = await fs.stat(filepath);
-            console.log('📊 File stats - Size:', stats.size, 'bytes');
-        } catch (fileError) {
-            console.error('❌ Error writing audio file:', fileError);
-            throw fileError;
+            const blob = await uploadToBlob(filename, audioBuffer, 'audio/webm');
+            blobUrl = blob.url;
+            console.log('✅ Audio file uploaded to Blob:', blobUrl);
+        } catch (blobError) {
+            console.error('❌ Error uploading to Blob:', blobError);
+            throw blobError;
         }
 
         // Create recording metadata
         const recording = {
             id,
             filename,
+            blobUrl, // Store the Vercel Blob URL
             prompt,
             timestamp: timestamp || new Date().toISOString(),
             tags: [],
@@ -257,16 +273,9 @@ app.post('/api/recordings', async (req, res) => {
             
             recordings.push(recording);
             await saveRecordings(recordings);
-            console.log('✅ Recording metadata saved to JSON');
+            console.log('✅ Recording metadata saved to mock storage');
         } catch (metadataError) {
             console.error('❌ Error saving metadata:', metadataError);
-            // Try to clean up the audio file if metadata save fails
-            try {
-                await fs.unlink(filepath);
-                console.log('🧹 Cleaned up audio file after metadata error');
-            } catch (cleanupError) {
-                console.error('⚠️ Could not clean up audio file:', cleanupError);
-            }
             throw metadataError;
         }
 
@@ -390,7 +399,7 @@ app.get('/api/recordings/random', async (req, res) => {
     }
 });
 
-// Stream audio file
+// Stream audio file from Vercel Blob
 app.get('/api/recordings/:id/audio', async (req, res) => {
     try {
         const recordings = await loadRecordings();
@@ -400,25 +409,16 @@ app.get('/api/recordings/:id/audio', async (req, res) => {
             return res.status(404).json({ error: 'Recording not found' });
         }
 
-        const filepath = path.join(RECORDINGS_DIR, recording.filename);
-        
-        // Check if file exists
-        try {
-            await fs.access(filepath);
-        } catch {
-            return res.status(404).json({ error: 'Audio file not found' });
+        if (!recording.blobUrl) {
+            return res.status(404).json({ error: 'Audio file URL not found' });
         }
 
-        // Set appropriate headers
-        res.setHeader('Content-Type', 'audio/webm');
-        res.setHeader('Accept-Ranges', 'bytes');
-        
-        // Stream the file
-        const readStream = require('fs').createReadStream(filepath);
-        readStream.pipe(res);
+        // Redirect to the Vercel Blob URL for direct streaming
+        // This is the most efficient way as Vercel Blob handles the streaming
+        res.redirect(recording.blobUrl);
         
     } catch (error) {
-        console.error('Error streaming audio:', error);
+        console.error('Error streaming audio from blob:', error);
         res.status(500).json({ error: 'Failed to stream audio' });
     }
 });
@@ -583,13 +583,15 @@ app.delete('/api/admin/recordings/:id', requireAuth, async (req, res) => {
         }
 
         const recording = recordings[recordingIndex];
-        const filepath = path.join(RECORDINGS_DIR, recording.filename);
 
-        // Delete audio file
-        try {
-            await fs.unlink(filepath);
-        } catch (error) {
-            console.warn('Audio file not found for deletion:', error.message);
+        // Delete audio file from Vercel Blob
+        if (recording.blobUrl) {
+            try {
+                await deleteFromBlob(recording.blobUrl);
+                console.log('✅ Audio file deleted from Blob:', recording.blobUrl);
+            } catch (error) {
+                console.warn('Audio file not found for deletion in Blob:', error.message);
+            }
         }
 
         // Remove from recordings array
@@ -611,8 +613,7 @@ app.get('/admin', (req, res) => {
 // Initialize and start server
 async function startServer() {
     try {
-        // Create directories if they don't exist
-        await fs.mkdir(RECORDINGS_DIR, { recursive: true });
+        // Create data directory if it doesn't exist
         await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
         
         // Initialize data file

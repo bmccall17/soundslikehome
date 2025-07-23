@@ -1,8 +1,4 @@
-<img width="36%" height="717" alt="image" src="https://github.com/user-attachments/assets/bfc1c3c5-c42f-4056-9493-1ce07e932646" />
-<img width="63%" height="943" alt="image" src="https://github.com/user-attachments/assets/b4d1159e-4269-4dde-8717-5571cce8d0e6" />
-<br>
-
-## Sounds Like Home 🎵
+# Sounds Like Home 🎵
 
 A web application where users can record and listen to audio responses about what "home" sounds like to them. Features a sequential prompt system and beautiful rainbow bubble visualizations.
 
@@ -27,7 +23,7 @@ The admin panel is available at `/admin`. Contact the site administrator for log
 - **Backend**: Node.js, Express.js
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
 - **Audio**: Web Audio API, MediaRecorder API
-- **Storage**: JSON file-based data storage
+- **Storage**: Vercel Blob Storage for audio files, JSON for metadata
 - **Hosting**: Vercel
 
 ## Local Development
@@ -82,12 +78,27 @@ openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 3
 
 The application is configured for easy deployment to Vercel:
 
-1. Connect your GitHub repository to Vercel
-2. Set environment variables:
+1. **Set up Vercel Blob Storage**:
+   - Create a new Blob Store named `soundslikehome-blob` in your Vercel dashboard
+   - Copy the `BLOB_READ_WRITE_TOKEN` from the storage settings
+
+2. **Connect your GitHub repository to Vercel**
+
+3. **Set environment variables** in Vercel dashboard:
    - `NODE_ENV=production`
    - `SESSION_SECRET=your-secure-session-secret`
    - `ADMIN_PASSWORD=your-admin-password`
-3. Deploy automatically with git push
+   - `BLOB_READ_WRITE_TOKEN=your-blob-token-from-step-1`
+
+4. **Deploy automatically with git push**
+
+### Local Development with Blob Storage
+
+For local development that uses Vercel Blob Storage:
+
+1. Copy `.env.example` to `.env`
+2. Fill in your `BLOB_READ_WRITE_TOKEN` from Vercel dashboard
+3. Run `npm start` or `npm run dev`
 
 ## Contributing
 

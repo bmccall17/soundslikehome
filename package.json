@@ -9,6 +9,7 @@
     "build": "echo 'No build step required'"
   },
   "dependencies": {
+    "@vercel/blob": "^1.1.1",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "uuid": "^9.0.1"
@@ -19,7 +20,7 @@
   "keywords": [
     "audio",
     "recording",
-    "web-app", 
+    "web-app",
     "home",
     "community",
     "storytelling"

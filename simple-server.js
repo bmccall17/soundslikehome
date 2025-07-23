@@ -4,10 +4,37 @@ const fs = require('fs').promises;
 const path = require('path');
 const url = require('url');
 const querystring = require('querystring');
+const { put, del, list } = require('@vercel/blob');
 
 const PORT = 3000;
-const RECORDINGS_DIR = path.join(__dirname, 'recordings');
 const DATA_FILE = path.join(__dirname, 'data', 'recordings.json');
+
+// Vercel Blob storage configuration
+const BLOB_STORE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+
+// Blob storage helper functions
+async function uploadToBlob(filename, buffer, contentType = 'audio/webm') {
+    try {
+        const blob = await put(filename, buffer, {
+            access: 'public',
+            contentType: contentType,
+            token: BLOB_STORE_TOKEN
+        });
+        return blob;
+    } catch (error) {
+        console.error('Error uploading to blob:', error);
+        throw error;
+    }
+}
+
+async function deleteFromBlob(url) {
+    try {
+        await del(url, { token: BLOB_STORE_TOKEN });
+    } catch (error) {
+        console.error('Error deleting from blob:', error);
+        throw error;
+    }
+}
 
 // Simple session storage (in memory)
 const sessions = new Map();
@@ -190,17 +217,12 @@ async function requestHandler(req, res) {
 
                     // Generate unique ID and filename
                     const id = generateUUID();
-                    const filename = `recording-${id}.webm`;
-                    const filepath = path.join(RECORDINGS_DIR, filename);
+                    const filename = `recordings/recording-${id}.webm`;
                     
-                    console.log('📁 Saving to filepath:', filepath);
-                    console.log('📂 RECORDINGS_DIR:', RECORDINGS_DIR);
+                    console.log('📁 Uploading to Vercel Blob:', filename);
+                    console.log('📊 Audio data received:', audioData ? audioData.length : 0, 'characters');
 
-                    // Ensure recordings directory exists
-                    await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-                    console.log('✅ Recordings directory confirmed/created');
-
-                    // Convert base64 to buffer and save file
+                    // Convert base64 to buffer and save to Vercel Blob
                     console.log('🔍 Original audioData starts with:', audioData.substring(0, 50));
                     
                     // Better base64 extraction - handle different data URI formats
@@ -248,17 +270,22 @@ async function requestHandler(req, res) {
                         console.log('⚠️ Warning: Audio buffer is very small:', audioBuffer.length, 'bytes');
                     }
                     
-                    await fs.writeFile(filepath, audioBuffer);
-                    console.log('✅ Audio file saved successfully');
-                    
-                    // Verify file was written
-                    const stats = await fs.stat(filepath);
-                    console.log('📊 File stats - Size:', stats.size, 'bytes');
+                    // Upload to Vercel Blob storage
+                    let blobUrl;
+                    try {
+                        const blob = await uploadToBlob(filename, audioBuffer, 'audio/webm');
+                        blobUrl = blob.url;
+                        console.log('✅ Audio file uploaded to Blob:', blobUrl);
+                    } catch (blobError) {
+                        console.error('❌ Error uploading to Blob:', blobError);
+                        throw blobError;
+                    }
 
                     // Create recording metadata
                     const recording = {
                         id,
                         filename,
+                        blobUrl, // Store the Vercel Blob URL
                         prompt,
                         timestamp: timestamp || new Date().toISOString(),
                         tags: [],
@@ -322,7 +349,7 @@ async function requestHandler(req, res) {
                 return;
             }
 
-            // Stream audio file
+            // Stream audio file from Vercel Blob
             const audioMatch = pathname.match(/^\/api\/recordings\/([^\/]+)\/audio$/);
             if (audioMatch && method === 'GET') {
                 try {
@@ -336,41 +363,18 @@ async function requestHandler(req, res) {
                         return;
                     }
 
-                    const filepath = path.join(RECORDINGS_DIR, recording.filename);
-                    
-                    try {
-                        await fs.access(filepath);
-                    } catch {
+                    if (!recording.blobUrl) {
                         res.writeHead(404, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Audio file not found' }));
+                        res.end(JSON.stringify({ error: 'Audio file URL not found' }));
                         return;
                     }
 
-                    // Get file stats for proper headers
-                    const stats = await fs.stat(filepath);
-                    
-                    // Set proper headers for audio streaming
-                    res.writeHead(200, { 
-                        'Content-Type': 'audio/webm',
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': stats.size,
-                        'Cache-Control': 'public, max-age=0'
-                    });
-                    
-                    // Stream the file using createReadStream for better performance
-                    const readStream = require('fs').createReadStream(filepath);
-                    readStream.pipe(res);
-                    
-                    readStream.on('error', (streamError) => {
-                        console.error('Stream error:', streamError);
-                        if (!res.headersSent) {
-                            res.writeHead(500, { 'Content-Type': 'application/json' });
-                            res.end(JSON.stringify({ error: 'Stream error' }));
-                        }
-                    });
+                    // Redirect to the Vercel Blob URL for direct streaming
+                    res.writeHead(302, { 'Location': recording.blobUrl });
+                    res.end();
                     
                 } catch (error) {
-                    console.error('Error streaming audio:', error);
+                    console.error('Error streaming audio from blob:', error);
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Failed to stream audio' }));
                 }
@@ -577,13 +581,15 @@ async function requestHandler(req, res) {
                     }
 
                     const recording = recordings[recordingIndex];
-                    const filepath = path.join(RECORDINGS_DIR, recording.filename);
 
-                    // Delete audio file
-                    try {
-                        await fs.unlink(filepath);
-                    } catch (error) {
-                        console.warn('Audio file not found for deletion:', error.message);
+                    // Delete audio file from Vercel Blob
+                    if (recording.blobUrl) {
+                        try {
+                            await deleteFromBlob(recording.blobUrl);
+                            console.log('✅ Audio file deleted from Blob:', recording.blobUrl);
+                        } catch (error) {
+                            console.warn('Audio file not found for deletion in Blob:', error.message);
+                        }
                     }
 
                     // Remove from recordings array
@@ -628,8 +634,7 @@ async function requestHandler(req, res) {
 // Start server
 async function startServer() {
     try {
-        // Create directories if they don't exist
-        await fs.mkdir(RECORDINGS_DIR, { recursive: true });
+        // Create data directory if it doesn't exist
         await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
         
         // Initialize data file
